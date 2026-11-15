@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "coinolive"
+version = "1.0.0"
+description = "Python library for the Coino Live crypto payment API"
+readme = "README.md"
+license = { text = "MIT" }
+requires-python = ">=3.8"
+keywords = ["coino live", "crypto", "payments", "bitcoin", "usdt", "payment gateway"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+
+[project.urls]
+Homepage = "https://coino.live/api-guide"
+
+[tool.setuptools]
+packages = ["coinolive"]

@@ -1,92 +1,117 @@
-# CoinoLive Python Client
+# Coino Live Python library
 
-## Introduction
+> **Updating from the old version?** Earlier code in this repository used the Coino Live API v1, which has been retired: its endpoints (`/api/v1/...`) no longer answer. This version uses the current [API v2](https://coino.live/api-guide). Replace the old files with these.
 
-CoinoLive Python Client is a Python wrapper for interacting with the CoinoLive API. It provides a convenient way to integrate CoinoLive's crypto payment gateway functionality into Python applications.
+Accept crypto payments with the [Coino Live API](https://coino.live/api-guide). Python 3.8+, standard library only.
 
-## Why Choose Us?
+## Install
 
-- **No KYC:** You can sign up and start accepting payments in minutes, with just an email address and a password.
-- **Sky's the Limit:** You can access your money anytime, anywhere, and in any currency you prefer.
-- **Affordable and Fair:** We charge only a flat fee of 0.25% per transaction.
-- **Safe and Sound:** We use the latest encryption and security protocols to protect your data and funds.
-- **Seamless and Simple:** We provide a user-friendly interface. You can also customize your payment page and checkout process to suit your brand and preferences.
-
-## Installation
-
-To install CoinoLive Python Client, simply clone this repository:
+Download `coinolive-python-<version>.zip` from [coino.live/api-guide](https://coino.live/api-guide#libraries), unzip it
+and install the folder:
 
 ```bash
-git clone https://github.com/coino-live/python-crypto-payments.git
+pip install ./coinolive-python
 ```
 
-## Usage
+Or copy the `coinolive` folder inside it next to your code.
 
-1. Import the `CoinoLive` class into your Python project:
+## Take a payment
 
-    ```python
-    from coino_live import CoinoLive
-    ```
+```python
+import coinolive
 
-2. Initialize a `CoinoLive` object with your API key:
+coino = coinolive.Client("ck_live_…")  # Dashboard → Developers
 
-    ```python
-    api_key = "YOUR_API_KEY_HERE"
-    coino_live = CoinoLive(api_key)
-    ```
+payment = coino.payments.create(
+    amount="25.00",          # a string, at most 2 decimals
+    currency="EUR",          # any code from coino.currencies(); USD by default
+    order_id="1001",
+    success_url="https://shop.example/thanks",
+    cancel_url="https://shop.example/cart",
+    notify_url="https://shop.example/coino-webhook",
+)
 
-3. Use the provided methods to interact with the CoinoLive API. For example:
+return redirect(payment["checkout_url"])
+```
 
-    ```python
-    # Create Order
-    order_response = coino_live.create_order(amount=10, callback_url="https://domain.com/verify_payment",
-                                              description="Pay For shoes", gate_id="M-2")
-    order_id = order_response["Order_ID"]
+Ship the order when a fresh read says `paid`:
 
-    # Redirect Payment
-    coino_live.redirect_payment(order_id)
+```python
+payment = coino.payments.retrieve(payment_id)
+if payment["status"] == "paid":
+    ...
+```
 
-    # Verify Payment
-    verification_response = coino_live.verify_payment(order_id)
-    ```
+Statuses: `open`, `confirming`, `partially_paid`, `paid`, `expired`, `cancelled`.
 
+## Webhooks
 
-## Documentation
+The signature covers the raw body, so pass it unparsed:
 
-For detailed information on how to install, configure, and use the Coino Live WooCommerce Plugin, please refer to our [Documentation](https://coino.live/document).
+```python
+from coinolive import webhooks, SignatureVerificationError
 
-## Support
+@app.post("/coino-webhook")  # Flask
+def coino_webhook():
+    try:
+        event = webhooks.verify(request.get_data(), request.headers.get("X-Coino-Signature"), SIGNING_SECRET)
+    except SignatureVerificationError:
+        return "", 401
+    if event["event"].startswith("payment."):
+        payment = coino.payments.retrieve(event["data"]["id"])  # act on what the API says, not on the webhook body
+    return "", 200
+```
 
-For any questions, issues, or feedback related to the Coino Live WooCommerce Plugin, please reach out to our support team at [support@coino.live](mailto:support@coino.live).
+In Django use `request.body` and `request.headers.get("X-Coino-Signature")`.
 
-## Contributing
+## Everything else
 
-We welcome contributions from the community to improve the Coino Live WooCommerce Plugin. If you have any suggestions, bug fixes, or feature requests, please open an issue or submit a pull request.
+```python
+coino.payments.list(status="paid", order_id="1001")   # {"data": […], "meta": {"next_cursor": …}}
+for payment in coino.payments.all(status="paid"):     # every page
+    ...
+coino.payments.cancel(payment_id)                     # only while nothing was received
 
-## Connect with Us
+coino.currencies()                                    # prices can be in these
+coino.assets()                                        # customers can pay with these
+coino.balances()                                      # your balance per coin, with usd_value
 
-Stay updated with the latest news and updates from Coino Live:
+user = coino.custody.create("user-42", name="Ada")    # lifetime deposit addresses for your users
+coino.custody.retrieve(user["id"])
+coino.custody.list(external_id="user-42")
+coino.custody.deposits(user["id"])
+coino.custody.transfer(user["id"], "usdt-tron")       # move the user's balance to yours
 
-- Follow us on [Twitter](https://twitter.com/coino_live)
-- Follow us on [Instagran](https://www.instagram.com/coino.live)
-- Follow us on [Linkedin](https://linkedin.com/company/coino-live)
-- Subscribe to our [Blog](https://coino.live/blog)
-  
-## Products
+coino.withdrawals.create("usdt-tron", "50", "T…", reference="payout-77")
+coino.withdrawals.retrieve(withdrawal_id)
+```
 
-- [Accept Crypto Payments](https://coino.live/crypto-gateway)
-- [Personal Crypto Gateway](https://coino.live/personal-crypto-gateway)
-- [Crypto Donation](https://coino.live/crypto-donation)
-- [Invoice Manager](https://coino.live/invoice-manager)
-- [POS Crypto Payment Terminal](https://coino.live/point-of-sale)
-- [Crypto Form Builder](https://coino.live/form-builder)
+## Errors and retries
 
-## Links
+Every failure raises one of these (all in `coinolive`):
 
-- [Website](https://coino.live)
-- [About Us](https://coino.live/about)
-- [Contact Us](https://coino.live/contact)
-- [FAQ](https://coino.live/faq)
+| Error | When |
+| --- | --- |
+| `AuthenticationError` | Wrong or revoked key, or the gateway is suspended (401) |
+| `NotFoundError` | Unknown ID, or it belongs to another gateway (404) |
+| `ValidationError` | The request was refused; `e.errors` names the fields (422) |
+| `RateLimitError` | Too many requests (429) |
+| `ApiError` | Anything else; the parent of the four above, with `e.status` |
+| `ConnectionError` | The API could not be reached, or the request timed out |
 
+All of them inherit from `CoinoLiveError`.
 
-Thank you for choosing Coino Live for your cryptocurrency payment gateway needs!
+Network errors, 429 and 5xx answers are retried twice with a short pause, but only for requests that are safe to repeat:
+reads, `payments.create()` (it always sends an idempotency key, random unless you pass `idempotency_key=`),
+`custody.create()` (same `external_id`, same user) and `withdrawals.create()` with a `reference`.
+
+```python
+coino = coinolive.Client("ck_live_…", timeout=30, max_retries=2, base_url="https://coino.live/api/v2")
+```
+
+## Tests
+
+```bash
+python tests/run.py
+COINOLIVE_API_URL=https://… COINOLIVE_API_KEY=ck_test_… python tests/run.py   # also against a real API
+```
