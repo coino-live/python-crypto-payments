@@ -16,7 +16,13 @@ Coino Live is a crypto payment gateway that supports **117 assets on 11 networks
 
 ## Install the Python library
 
-Download `coinolive-python-<version>.zip` from [coino.live/api-guide](https://coino.live/api-guide#libraries), unzip it and install the folder:
+Install it from [PyPI](https://pypi.org/project/coinolive/):
+
+```bash
+pip install coinolive
+```
+
+Or download `coinolive-python-<version>.zip` from [coino.live/api-guide](https://coino.live/api-guide#libraries), unzip it and install the folder:
 
 ```bash
 pip install ./coinolive-python
