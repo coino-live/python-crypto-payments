@@ -18,6 +18,8 @@ classifiers = [
 
 [project.urls]
 Homepage = "https://coino.live/api-guide"
+Repository = "https://github.com/coino-live/python-crypto-payments"
+Issues = "https://github.com/coino-live/python-crypto-payments/issues"
 
 [tool.setuptools]
 packages = ["coinolive"]
